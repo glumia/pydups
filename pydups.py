@@ -17,6 +17,27 @@ def is_pass(node):
     return len(node.body) == 1 and isinstance(node.body[0], ast.Pass)
 
 
+def is_not_implemented(node):
+    return (
+        len(node.body) == 1
+        and isinstance(node.body[0], ast.Raise)
+        and (
+            node.body[0].exc.id  # Implicit exception instantiation
+            if isinstance(node.body[0].exc, ast.Name)
+            else node.body[0].exc.func.id  # Explicit exception instantiation
+        )
+        in {"NotImplemented", "NotImplementedError"}
+    )
+
+
+def is_constant(node):
+    return (
+        len(node.body) == 1
+        and isinstance(node.body[0], ast.Return)
+        and isinstance(node.body[0].value, (ast.NameConstant))
+    )
+
+
 class Visitor(ast.NodeVisitor):
     def __init__(self, functions, module_path):
         self.functions = functions
@@ -24,7 +45,12 @@ class Visitor(ast.NodeVisitor):
         self.class_name = None
 
     def visit_FunctionDef(self, node):
-        if is_init_with_only_assigns(node) or is_pass(node):
+        if (
+            is_pass(node)
+            or is_not_implemented(node)
+            or is_constant(node)
+            or is_init_with_only_assigns(node)
+        ):
             return
         args_map = {arg.arg: f"x{i}" for i, arg in enumerate(node.args.args)}
         hash = ast.dump(node)
