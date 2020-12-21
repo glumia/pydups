@@ -7,6 +7,16 @@ from collections import defaultdict
 import astunparse
 
 
+def is_init_with_only_assigns(node):
+    return node.name == "__init__" and all(
+        isinstance(sub_node, ast.Assign) for sub_node in node.body
+    )
+
+
+def is_pass(node):
+    return len(node.body) == 1 and isinstance(node.body[0], ast.Pass)
+
+
 class Visitor(ast.NodeVisitor):
     def __init__(self, functions, module_path):
         self.functions = functions
@@ -14,6 +24,8 @@ class Visitor(ast.NodeVisitor):
         self.class_name = None
 
     def visit_FunctionDef(self, node):
+        if is_init_with_only_assigns(node) or is_pass(node):
+            return
         args_map = {arg.arg: f"x{i}" for i, arg in enumerate(node.args.args)}
         hash = ast.dump(node)
         hash = hash.replace(
